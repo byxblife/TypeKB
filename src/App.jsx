@@ -674,7 +674,10 @@ export function App() {
 
           <button
             className={`simple-control ${musicPlaying ? "active" : ""}`}
-            onClick={toggleMusic}
+            onClick={(event) => {
+              toggleMusic();
+              if (event.detail > 0) event.currentTarget.blur();
+            }}
             title="打字時可按 Tab 切換音樂"
             type="button"
           >
