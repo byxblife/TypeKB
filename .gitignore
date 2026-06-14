@@ -1,0 +1,15 @@
+# 不上傳的內部文件
+AGENTS.md
+design-qa.md
+TypeKB_Prototype_v0.1_Portable.zip
+
+# 本機與建置檔案
+node_modules/
+.npm-cache/
+.npmrc
+dist/
+.DS_Store
+._*
+
+# 建議不公開的 QA 圖片
+qa-*.png
