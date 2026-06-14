@@ -1,5 +1,23 @@
 @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Newsreader:opsz,wght@6..72,300;6..72,400&display=swap");
 
+@property --scene-base {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #f5eadc;
+}
+
+@property --scene-glow-a {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #eabf9f;
+}
+
+@property --scene-glow-b {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #d8d6b8;
+}
+
 :root {
   font-family: "DM Sans", "Noto Sans TC", sans-serif;
   color: #2e342f;
@@ -48,37 +66,51 @@ body {
   isolation: isolate;
   color: var(--ink);
   background: var(--scene-base);
-  transition: background-color 2.2s ease, color 0.6s ease;
+  transition:
+    --scene-base 2.2s ease,
+    --scene-glow-a 2.2s ease,
+    --scene-glow-b 2.2s ease,
+    color 0.6s ease;
 }
 
 .atmosphere,
 .grain {
   position: absolute;
   inset: 0;
-  z-index: -2;
+  z-index: 0;
   pointer-events: none;
 }
 
 .atmosphere-one {
   inset: -25% -10% 20% 25%;
   border-radius: 46%;
-  background: radial-gradient(circle at center, color-mix(in srgb, var(--scene-glow-a) 88%, white), transparent 68%);
-  filter: blur(24px);
-  opacity: 0.72;
+  background: radial-gradient(
+    circle at center,
+    color-mix(in srgb, var(--scene-glow-a) 90%, white),
+    color-mix(in srgb, var(--scene-glow-a) 32%, transparent) 45%,
+    transparent 70%
+  );
+  filter: blur(18px);
+  opacity: 0.82;
   animation: drift-one 18s ease-in-out infinite alternate;
 }
 
 .atmosphere-two {
   inset: 30% 35% -25% -15%;
   border-radius: 48%;
-  background: radial-gradient(circle at center, color-mix(in srgb, var(--scene-glow-b) 84%, white), transparent 70%);
-  filter: blur(32px);
-  opacity: 0.58;
+  background: radial-gradient(
+    circle at center,
+    color-mix(in srgb, var(--scene-glow-b) 88%, white),
+    color-mix(in srgb, var(--scene-glow-b) 28%, transparent) 48%,
+    transparent 72%
+  );
+  filter: blur(24px);
+  opacity: 0.76;
   animation: drift-two 16s ease-in-out infinite alternate;
 }
 
 .grain {
-  z-index: -1;
+  z-index: 1;
   opacity: 0.035;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
   mix-blend-mode: multiply;
