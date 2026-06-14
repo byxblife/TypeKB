@@ -5,53 +5,61 @@ const SCENES = [
     id: "relax",
     name: "放鬆",
     english: "Ease",
-    track: "Soft Morning",
     base: "#f4ede3",
     glowA: "#e8c9b8",
     glowB: "#d7ddd0",
-    notes: [220, 277.18, 329.63],
   },
   {
     id: "focus",
     name: "專注",
     english: "Focus",
-    track: "Clear Current",
     base: "#e9eff0",
     glowA: "#b8d1d7",
     glowB: "#cbd4df",
-    notes: [196, 246.94, 293.66],
   },
   {
     id: "sleep",
     name: "睡前平靜",
     english: "Night",
-    track: "Moonlit Air",
     base: "#eceaf1",
     glowA: "#c9c4dc",
     glowB: "#c8d5df",
-    notes: [174.61, 220, 261.63],
   },
   {
     id: "recover",
     name: "低潮恢復",
     english: "Restore",
-    track: "Tender Ground",
     base: "#edf0e8",
     glowA: "#c6d2bc",
     glowB: "#e2d2aa",
-    notes: [207.65, 261.63, 311.13],
   },
   {
     id: "work",
     name: "工作沉澱",
     english: "Settle",
-    track: "Quiet Desk",
     base: "#ecebe7",
     glowA: "#c5cdd2",
     glowB: "#d3c5b7",
-    notes: [185, 233.08, 277.18],
   },
 ];
+
+const SOUND_MODULES = import.meta.glob("../sounds/*.{mp3,wav,ogg,m4a,aac}", {
+  eager: true,
+  query: "?url",
+  import: "default",
+});
+
+const SOUND_TRACKS = Object.entries(SOUND_MODULES)
+  .map(([path, url]) => {
+    const filename = path.split("/").pop() || path;
+    const title = filename
+      .replace(/\.[^.]+$/, "")
+      .replace(/[_-]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    return { filename, title, url };
+  })
+  .sort((a, b) => a.filename.localeCompare(b.filename, "en"));
 
 const THEMES = [
   { id: "stillness", name: "Stillness", description: "A quiet moment to return to yourself." },
@@ -219,72 +227,37 @@ function countTypeableCharacters(text) {
   return [...text].filter(isTypeableCharacter).length;
 }
 
-function AmbientAudio({ scene, playing, volume }) {
-  const engineRef = useRef(null);
-
+function PlaylistAudio({ audioRef, track, playing, volume, onEnded }) {
   useEffect(() => {
-    if (!playing) {
-      if (engineRef.current) {
-        engineRef.current.context.close();
-        engineRef.current = null;
-      }
-      return undefined;
-    }
-
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContext) return undefined;
-
-    const context = new AudioContext();
-    const master = context.createGain();
-    const filter = context.createBiquadFilter();
-    master.gain.value = volume * 0.055;
-    filter.type = "lowpass";
-    filter.frequency.value = 760;
-    filter.Q.value = 0.4;
-    filter.connect(master);
-    master.connect(context.destination);
-
-    const oscillators = scene.notes.map((frequency, index) => {
-      const oscillator = context.createOscillator();
-      const gain = context.createGain();
-      oscillator.type = index === 0 ? "sine" : "triangle";
-      oscillator.frequency.value = frequency / (index === 2 ? 2 : 1);
-      oscillator.detune.value = index * 3 - 3;
-      gain.gain.value = index === 0 ? 0.42 : 0.18;
-      oscillator.connect(gain);
-      gain.connect(filter);
-      oscillator.start();
-      return oscillator;
-    });
-
-    const pulse = context.createOscillator();
-    const pulseGain = context.createGain();
-    pulse.frequency.value = 0.08;
-    pulseGain.gain.value = 110;
-    pulse.connect(pulseGain);
-    pulseGain.connect(filter.frequency);
-    pulse.start();
-
-    engineRef.current = { context, master, oscillators, pulse };
-    return () => {
-      oscillators.forEach((oscillator) => oscillator.stop());
-      pulse.stop();
-      context.close();
-      engineRef.current = null;
-    };
-  }, [playing, scene]);
-
-  useEffect(() => {
-    if (engineRef.current) {
-      engineRef.current.master.gain.setTargetAtTime(
-        volume * 0.055,
-        engineRef.current.context.currentTime,
-        0.25,
-      );
-    }
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.volume = volume;
   }, [volume]);
 
-  return null;
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (playing) {
+      audio.play().catch(() => {
+        // 瀏覽器可能要求使用者先互動；下一次點擊播放時會再次嘗試。
+      });
+    } else {
+      audio.pause();
+    }
+  }, [playing, track]);
+
+  if (!track) return null;
+
+  return (
+    <audio
+      onEnded={onEnded}
+      onError={onEnded}
+      preload="auto"
+      ref={audioRef}
+      src={track.url}
+    />
+  );
 }
 
 function HeaderControl({ label, value, open, onClick, children }) {
@@ -301,6 +274,7 @@ function HeaderControl({ label, value, open, onClick, children }) {
 
 export function App() {
   const saved = useMemo(readSavedState, []);
+  const audioRef = useRef(null);
   const [sceneId, setSceneId] = useState(saved.sceneId || "relax");
   const [themeId, setThemeId] = useState(saved.themeId || "stillness");
   const [pendingThemeId, setPendingThemeId] = useState(null);
@@ -320,6 +294,9 @@ export function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [sourceOpen, setSourceOpen] = useState(false);
   const [musicPlaying, setMusicPlaying] = useState(saved.musicPlaying ?? false);
+  const [trackIndex, setTrackIndex] = useState(() =>
+    SOUND_TRACKS.length ? Math.floor(Math.random() * SOUND_TRACKS.length) : 0,
+  );
   const [volume, setVolume] = useState(saved.volume ?? 0.28);
   const [reducedMotion, setReducedMotion] = useState(
     saved.reducedMotion ?? window.matchMedia("(prefers-reduced-motion: reduce)").matches,
@@ -329,6 +306,7 @@ export function App() {
   );
 
   const scene = SCENES.find((item) => item.id === sceneId) || SCENES[0];
+  const currentTrack = SOUND_TRACKS[trackIndex] || null;
   const theme = THEMES.find((item) => item.id === themeId) || THEMES[0];
   const availableSentences = useMemo(() => {
     const matched = SENTENCES.filter((item) => item.theme === themeId);
@@ -389,14 +367,34 @@ export function App() {
     setIsComplete(false);
   }, []);
 
+  const startMusic = useCallback(() => {
+    setMusicPlaying(true);
+    audioRef.current?.play().catch(() => {
+      // 若瀏覽器仍阻止播放，使用者可再次按音樂控制重試。
+    });
+  }, []);
+
+  const stopMusic = useCallback(() => {
+    setMusicPlaying(false);
+    audioRef.current?.pause();
+  }, []);
+
+  const toggleMusic = useCallback(() => {
+    if (musicPlaying) {
+      stopMusic();
+    } else {
+      startMusic();
+    }
+  }, [musicPlaying, startMusic, stopMusic]);
+
   const begin = useCallback(() => {
     setIntroVisible(false);
     setIsStarted(true);
     setIsPaused(false);
     setOpenControl(null);
-    if (!saved.seenIntro && !musicPlaying) setMusicPlaying(true);
+    if (musicPlaying || !saved.seenIntro) startMusic();
     persist({ seenIntro: true });
-  }, [musicPlaying, persist, saved.seenIntro]);
+  }, [musicPlaying, persist, saved.seenIntro, startMusic]);
 
   const togglePause = useCallback(() => {
     if (!isStarted) {
@@ -489,7 +487,7 @@ export function App() {
         !sourceOpen
       ) {
         event.preventDefault();
-        setMusicPlaying((value) => !value);
+        toggleMusic();
         return;
       }
 
@@ -548,6 +546,7 @@ export function App() {
     sourceOpen,
     startedAt,
     statuses,
+    toggleMusic,
     togglePause,
   ]);
 
@@ -593,6 +592,11 @@ export function App() {
     persist({ stats: nextStats });
   };
 
+  const playNextTrack = useCallback(() => {
+    if (SOUND_TRACKS.length < 2) return;
+    setTrackIndex((current) => (current + 1) % SOUND_TRACKS.length);
+  }, []);
+
   const themeStyle = {
     "--scene-base": scene.base,
     "--scene-glow-a": scene.glowA,
@@ -609,7 +613,13 @@ export function App() {
         if (!isStarted && event.target.closest("button") === null) begin();
       }}
     >
-      <AmbientAudio scene={scene} playing={musicPlaying} volume={volume} />
+      <PlaylistAudio
+        audioRef={audioRef}
+        onEnded={playNextTrack}
+        playing={musicPlaying}
+        track={currentTrack}
+        volume={volume}
+      />
       <div className="atmosphere atmosphere-one" />
       <div className="atmosphere atmosphere-two" />
       <div className="grain" />
@@ -664,7 +674,7 @@ export function App() {
 
           <button
             className={`simple-control ${musicPlaying ? "active" : ""}`}
-            onClick={() => setMusicPlaying((value) => !value)}
+            onClick={toggleMusic}
             title="打字時可按 Tab 切換音樂"
             type="button"
           >
@@ -801,9 +811,9 @@ export function App() {
           <small>天</small>
         </div>
         <div className="track-info">
-          <span>暫用音景</span>
-          <strong>{scene.track}</strong>
-          <small>{scene.name}情境 · 即時合成</small>
+          <span>目前音樂</span>
+          <strong>{currentTrack?.title || "尚無音樂"}</strong>
+          <small>{SOUND_TRACKS.length} 首音樂 · 循環播放</small>
         </div>
       </footer>
 
@@ -881,7 +891,7 @@ export function App() {
             <div className="settings-note">
               <strong>Prototype 說明</strong>
               <p>
-                目前音樂為瀏覽器即時合成的暫用 ambient 音景，不代表正式選曲。打字紀錄只保存在此瀏覽器。
+                音樂來自 Prototype 的 sounds 資料夾，每次進入會隨機選擇起始曲，播放完畢後自動接續並循環。打字紀錄只保存在此瀏覽器。
               </p>
             </div>
 
