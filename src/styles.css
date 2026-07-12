@@ -388,6 +388,11 @@ main.paused {
   transition: color 0.24s ease, text-shadow 0.3s ease;
 }
 
+.sentence-text .space {
+  display: inline;
+  padding: 0 0.18em;
+}
+
 .sentence-text .correct {
   color: #354139;
   text-shadow: 0 7px 24px rgba(103, 122, 108, 0.25);
@@ -402,7 +407,7 @@ main.paused {
 }
 
 .sentence-text .current {
-  color: #313b34;
+  color: rgba(47, 54, 49, 0.42);
 }
 
 .sentence-text .current::after {

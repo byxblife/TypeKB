@@ -715,6 +715,7 @@ export function App() {
                 <span
                   className={[
                     isLetter ? "letter" : "punctuation",
+                    character === " " ? "space" : "",
                     statuses[index] || "",
                     isCurrent ? "current" : "",
                   ]
